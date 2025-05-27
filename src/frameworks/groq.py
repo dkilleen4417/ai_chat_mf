@@ -4,8 +4,8 @@ Groq API implementation for chat completions.
 """
 import streamlit as st
 import requests
-import streamlit as st
 from typing import Dict, List, Optional
+import time
 
 # Import API key utilities
 from utils.api_keys import get_api_key, validate_api_key
@@ -55,8 +55,8 @@ def process_chat(
             "prompt_tokens": 0, "completion_tokens": 0, "elapsed_time": 0
         }
 
-        # Safely get and validate the API key
-    api_key = get_api_key()
+    # Safely get and validate the API key
+    api_key = get_api_key(api_key_ref)
     is_valid, error_msg = validate_api_key(api_key, "API key")
     if not is_valid:
         return {'error': error_msg}

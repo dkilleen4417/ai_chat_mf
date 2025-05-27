@@ -263,6 +263,13 @@ def get_chat_response():
     if not framework_config:
         st.error(f"Framework configuration for '{framework_name}' not found in database.")
         return None
+        
+    # Ensure required fields exist in framework_config for Anthropic
+    if framework_name.lower() == 'anthropic':
+        if 'api_key_ref' not in framework_config:
+            framework_config['api_key_ref'] = 'ANTHROPIC_API_KEY'
+        if 'api_base_url' not in framework_config:
+            framework_config['api_base_url'] = 'https://api.anthropic.com/v1/messages'
 
     start_time = current_time()
     
@@ -291,6 +298,9 @@ def get_chat_response():
         
     # Call the framework-specific processing function
     try:
+        print(f"[DEBUG] Calling {framework_name}.process_chat with model: {fresh_chat['model']}")
+        print(f"[DEBUG] Framework config: {framework_config}")
+        
         # Call the framework-specific processing function with only the expected parameters
         result = framework_module.process_chat(
             messages=messages,
@@ -299,6 +309,10 @@ def get_chat_response():
             top_p=top_p,
             framework_config=framework_config  # Pass the fetched config
         )
+        
+        print(f"[DEBUG] {framework_name} response: {result}")
+        if not result or 'error' in result:
+            print(f"[ERROR] {framework_name} returned error: {result.get('error', 'Unknown error')}")
     except Exception as e:
         st.error(f"Error processing chat: {str(e)}")
         return None
@@ -425,17 +439,32 @@ def render_new_chat_tab():
             help="Enter a unique name for your new chat"
         ).strip()
         try:
-            db_models = list(model["name"] for model in ss.db.models.find())
-            available_models = db_models if db_models else []
+            # Get models with their framework information
+            db_models = list(ss.db.models.find({}, {"name": 1, "framework": 1, "_id": 0}))
+            # Create a list of tuples with (display_name, model_name)
+            available_models = [
+                (f"{model['name']} ({model.get('framework', 'No Framework')})", model['name'])
+                for model in db_models
+            ]
+            # If no models found, show empty list
+            available_models = available_models if db_models else []
         except Exception as e:
             st.error(f"Error fetching models: {str(e)}")
             available_models = []
         
-        model = st.selectbox(
+        # Create a mapping of display names to model names
+        model_mapping = {m[0]: m[1] for m in available_models} if available_models else {}
+        
+        # Show the dropdown with display names
+        selected_display = st.selectbox(
             "Select Model",
-            options=available_models,
+            options=list(model_mapping.keys()) if model_mapping else ["No models available"],
+            format_func=lambda x: x,
             help="Choose model - different models have different capabilities"
         )
+        
+        # Get the actual model name from the mapping
+        model = model_mapping.get(selected_display) if model_mapping else None
         
         try:
             db_prompts = list(ss.db.prompts.find())
@@ -621,18 +650,26 @@ def render_models_tab():
     # Edit Model functionality - Step 1: Select Model
     if model_action == "Edit":
         if 'edit_model_name' not in ss or ss.edit_model_name is None:
-            # Step 1: Model Selection
-            available_models = list(model["name"] for model in ss.db.models.find())
+            # Step 1: Model Selection with Framework Info
+            available_models = list(ss.db.models.find({}, {"name": 1, "framework": 1, "_id": 0}))
             
             if not available_models:
                 st.warning("No models available for editing.")
                 return
                 
-            selected_model = st.selectbox(
+            # Create display names with framework info
+            model_display_names = [
+                f"{model['name']} ({model.get('framework', 'No Framework')})" 
+                for model in available_models
+            ]
+            model_name_map = {display: model["name"] for display, model in zip(model_display_names, available_models)}
+                
+            selected_display = st.selectbox(
                 "Select Model to Edit", 
-                available_models,
+                model_display_names,
                 key="model_selector"
             )
+            selected_model = model_name_map[selected_display]
             
             if st.button('Edit Selected Model'):
                 ss.edit_model_name = selected_model
@@ -782,18 +819,29 @@ def render_models_tab():
     
     # Delete Model functionality
     if model_action == "Delete":
-        # Retrieve all models except the default
-        available_models = list(model["name"] for model in ss.db.models.find({"name": {"$ne": "grok-2-latest"}}))
+        # Retrieve all models except the default with their frameworks
+        available_models = list(ss.db.models.find(
+            {"name": {"$ne": "grok-2-latest"}}, 
+            {"name": 1, "framework": 1, "_id": 0}
+        ))
         
         if not available_models:
             st.warning("No models available for deletion.")
         else:
+            # Create display names with framework info
+            model_display_names = [
+                f"{model['name']} ({model.get('framework', 'No Framework')})" 
+                for model in available_models
+            ]
+            model_name_map = {display: model["name"] for display, model in zip(model_display_names, available_models)}
+            
             with st.form("delete_model_form", clear_on_submit=True):
-                model_to_delete = st.selectbox(
+                selected_display = st.selectbox(
                     "Select Model to Delete", 
-                    available_models,
+                    model_display_names,
                     help="Note: 'grok-2-latest' cannot be deleted"
                 )
+                model_to_delete = model_name_map[selected_display]
                 
                 submitted = st.form_submit_button("Delete Model")
                 

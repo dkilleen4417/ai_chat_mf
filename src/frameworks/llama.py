@@ -50,6 +50,9 @@ def process_chat(
 
     api_key_ref = framework_config.get("api_key_ref")
     api_base_url = framework_config.get("api_base_url")
+    # Force correct base URL if needed
+    if api_base_url and api_base_url.startswith("https://api.llama.ai"):
+        api_base_url = "https://api.llama.com/v1/chat/completions"
 
     if not api_key_ref:
         return {
@@ -86,12 +89,10 @@ def process_chat(
     # Use mapped model name if it exists, otherwise use the provided model name
     model = model_mapping.get(model, model)
     
-    # Prepare request headers
-    # The API key already includes the 'LLM|' prefix, so we use it as is
+    # Prepare request headers: only Authorization per working curl
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-        "x-llm-key": api_key  # Some Llama API versions might expect this header
+        "Authorization": f"Bearer {api_key}"
     }
     
     # Prepare messages (ensure they have the correct format)
@@ -122,12 +123,11 @@ def process_chat(
         "model": model,
         "messages": cleaned_messages,
         "temperature": max(0.0, min(1.0, float(temperature))),  # Clamp to 0-1 range
-        "top_p": max(0.0, min(1.0, float(top_p))),  # Clamp to 0-1 range
     }
     
     # Add optional parameters if provided
     if max_tokens is not None:
-        payload["max_tokens"] = int(max_tokens)
+        payload["max_completion_tokens"] = int(max_tokens)
     
     # Add any additional parameters from **params that are supported by the API
     # Example: payload.update({k: v for k, v in params.items() if k in ["stop", "n", "stream"]})
@@ -135,12 +135,22 @@ def process_chat(
     # Make the API request
     start_time = time.time()
     try:
+        # Debug: Print the full request details
+        print(f"[DEBUG] Making request to: {api_base_url}")
+        print(f"[DEBUG] Headers: {headers}")
+        print(f"[DEBUG] Payload: {payload}")
+        
         response = requests.post(
             api_base_url,  # Use the base URL directly from secrets
             headers=headers,
             json=payload,
             timeout=60  # 60 second timeout
         )
+        
+        # Debug: Print the response status and first 500 chars of response
+        print(f"[DEBUG] Response status: {response.status_code}")
+        print(f"[DEBUG] Response headers: {dict(response.headers)}")
+        print(f"[DEBUG] Response content (first 500 chars): {response.text[:500]}")
         response.raise_for_status()
         data = response.json()
         
@@ -160,6 +170,13 @@ def process_chat(
         }
         
     except requests.exceptions.RequestException as e:
+        # Debug: Print full exception details
+        import traceback
+        print(f"[DEBUG] Request exception: {str(e)}")
+        print(f"[DEBUG] Traceback: {traceback.format_exc()}")
+        if hasattr(e, 'request'):
+            print(f"[DEBUG] Request headers: {e.request.headers}")
+            print(f"[DEBUG] Request body: {getattr(e.request, 'body', 'No body')}")
         error_msg = f"API request failed: {str(e)}"
         if hasattr(e, 'response') and e.response is not None:
             try:
