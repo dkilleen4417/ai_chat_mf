@@ -3,6 +3,9 @@ Ollama Framework Module
 Supports local Llama models via Ollama's OpenAI-compatible API.
 """
 
+from typing import Any, Dict, List, Optional
+import time
+
 import streamlit as st
 import requests
 import streamlit as st
@@ -61,13 +64,13 @@ def process_chat(
     api_key_ref = framework_config.get("api_key_ref")
     api_key = None
     if api_key_ref:
-            # Safely get and validate the API key
-    api_key = get_api_key()
-    is_valid, error_msg = validate_api_key(api_key, "API key")
-    if not is_valid:
-        return {'error': error_msg}
+        # Safely get and validate the API key
+        api_key = get_api_key(api_key_ref)
+        is_valid, error_msg = validate_api_key(api_key, "API key")
+        if not is_valid:
+            return {'error': error_msg}
 
-        if not api_key:
+    if not api_key:
             st.warning(f"API key for reference '{api_key_ref}' not found in st.secrets for Ollama. Proceeding without API key.")
 
     try:
