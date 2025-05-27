@@ -48,13 +48,13 @@ def process_chat(
         if not api_key_ref:
             return {"error": "API key reference (api_key_ref) not found in ChatGPT framework configuration."}
         if not api_base_url:
-            return {"error": "API base URL (api_base_url) not found in ChatGPT framework configuration."}
+              return {"error": "API base URL (api_base_url) not found in ChatGPT framework configuration."}
 
-            # Safely get and validate the API key
-    api_key = get_api_key()
-    is_valid, error_msg = validate_api_key(api_key, "API key")
-    if not is_valid:
-        return {'error': error_msg}
+        # Safely get and validate the API key
+        api_key = get_api_key(api_key_ref)
+        is_valid, error_msg = validate_api_key(api_key, "API key")
+        if not is_valid:
+            return {'error': error_msg}
 
         if not api_key:
             return {"error": f"API key for reference '{api_key_ref}' not found in st.secrets."}
