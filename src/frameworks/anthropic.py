@@ -40,7 +40,6 @@ def process_chat(
     start_time = time.time()
     
     if not framework_config:
-        print("[Anthropic] Error: framework_config not provided")
         return {
             "error": "Anthropic framework configuration not provided.",
             "content": "Error: Configuration not provided.",
@@ -72,7 +71,6 @@ def process_chat(
             }
 
         # Safely get and validate the API key
-        print(f"[Anthropic] Getting API key with reference: {api_key_ref}")
         api_key = get_api_key(api_key_ref)
         
         if not api_key:
@@ -94,7 +92,7 @@ def process_chat(
                 "elapsed_time": 0
             }
             
-        print("[Anthropic] API key validation successful")
+
 
         # Construct the full URL - ensure we don't double-append /v1/messages
         base_url = api_base_url.rstrip('/')
@@ -105,7 +103,7 @@ def process_chat(
                 base_url = f"{base_url}/v1/messages"
         url = base_url
         
-        print(f"[Anthropic] Making request to: {url}")
+
         # Updated headers for Anthropic API
         headers = {
             "x-api-key": api_key,
@@ -147,7 +145,7 @@ def process_chat(
         if system_prompt:
             payload["system"] = system_prompt.strip()
             
-        print(f"[Anthropic] Payload: {payload}")
+
 
         headers = {
             "x-api-key": api_key,
@@ -170,9 +168,7 @@ def process_chat(
             response.raise_for_status()
             data = response.json()
             
-            # Log successful response
-            print(f"[Anthropic] Response status: {response.status_code}")
-            print(f"[Anthropic] Response data: {data}")
+            # Response handling
             
         except requests.exceptions.HTTPError as http_err:
             elapsed_time = time.time() - start_time
@@ -181,10 +177,9 @@ def process_chat(
                 try:
                     error_data = http_err.response.json()
                     error_msg += f" - {error_data.get('error', {}).get('message', 'No error details')}"
-                    print(f"[Anthropic] Error response: {error_data}")
+
                 except ValueError:
                     error_msg += f" - {http_err.response.text}"
-            print(f"[Anthropic] {error_msg}")
             return {
                 "error": error_msg,
                 "content": f"Error: {error_msg}",
@@ -211,11 +206,8 @@ def process_chat(
             prompt_tokens = usage.get("input_tokens", 0)
             completion_tokens = usage.get("output_tokens", 0)
             
-            print(f"[Anthropic] Extracted content: {content[:100]}...")
-            
         except (KeyError, IndexError, AttributeError) as e:
             error_msg = f"Error parsing API response: {str(e)}"
-            print(f"[Anthropic] {error_msg}")
             return {
                 "error": error_msg,
                 "content": f"Error: {error_msg}",

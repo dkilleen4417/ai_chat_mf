@@ -33,24 +33,42 @@ st.set_page_config(
 
 ss = st.session_state
 
+import sys
+
+def get_db_source():
+    """
+    Determine which database to use based on a command-line argument.
+    Usage: streamlit run src/app.py -- --db_source atlas  (or 'local')
+    Defaults to 'local' if not provided.
+    """
+    db_source = "local"
+    for i, arg in enumerate(sys.argv):
+        if arg == "--db_source" and i + 1 < len(sys.argv):
+            db_source = sys.argv[i + 1].lower()
+    return db_source
+
 def get_database():
-    """Get a database connection using credentials from Streamlit secrets."""
-    try:
-        mongodb_url = st.secrets["MONGODB_URL"]
-        db_name = st.secrets["MONGODB_DB_NAME"]
-        client = MongoClient(
-            mongodb_url,
-            maxPoolSize=50,           # Maximum number of connections in the pool
-            serverSelectionTimeoutMS=5000,  # Timeout for server selection in milliseconds
-            connectTimeoutMS=5000,    # Timeout for initial connection in milliseconds
-            retryWrites=True          # Enable automatic retrying of failed writes
+    """Get a database connection using credentials from Streamlit secrets and runtime parameter."""
+    db_source = get_db_source()
+    if db_source == "atlas":
+        mongodb_url = st.secrets["MONGO_ATLAS_URI"].format(
+            username=st.secrets["MONGO_ATLAS_USER"],
+            password=st.secrets["MONGO_ATLAS_CLUSTER_PW"],
+            host=st.secrets["MONGO_ATLAS_HOST"]
         )
-        # Test the connection
-        client.server_info()
-        return client[db_name]
-    except Exception as e:
-        st.error(f"Failed to connect to MongoDB: {e}")
-        raise
+        db_name = st.secrets["MONGO_ATLAS_DB_NAME"]
+    else:
+        mongodb_url = st.secrets["MONGO_LOCAL_URI"]
+        db_name = st.secrets["MONGO_LOCAL_DB_NAME"]
+    client = MongoClient(
+        mongodb_url,
+        maxPoolSize=50,
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        retryWrites=True
+    )
+    client.server_info()  # Test the connection
+    return client[db_name]
 
 def initialize():
     ss.initialized = True
@@ -298,8 +316,7 @@ def get_chat_response():
         
     # Call the framework-specific processing function
     try:
-        print(f"[DEBUG] Calling {framework_name}.process_chat with model: {fresh_chat['model']}")
-        print(f"[DEBUG] Framework config: {framework_config}")
+
         
         # Call the framework-specific processing function with only the expected parameters
         result = framework_module.process_chat(
@@ -310,9 +327,8 @@ def get_chat_response():
             framework_config=framework_config  # Pass the fetched config
         )
         
-        print(f"[DEBUG] {framework_name} response: {result}")
         if not result or 'error' in result:
-            print(f"[ERROR] {framework_name} returned error: {result.get('error', 'Unknown error')}")
+            st.error(f"Error from {framework_name}: {result.get('error', 'Unknown error')}")
     except Exception as e:
         st.error(f"Error processing chat: {str(e)}")
         return None

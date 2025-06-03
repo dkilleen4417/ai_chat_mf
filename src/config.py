@@ -14,6 +14,7 @@ GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
 OLLAMA_ENDPOINT = "http://localhost:11434/v1"
 CODESTRAL_CHAT_ENDPOINT = "https://codestral.mistral.ai/v1/chat/completions"
 CODESTRAL_COMP_ENDPOINT = "https://codestral.mistral.ai/v1/fim/completions"
+GROK_ENDPOINT = "https://api.x.ai/v1"  # xAI's Grok API endpoint
 
 # Application Settings (non-sensitive)
 WEATHERFLOW_STATION_ID = "137684"
